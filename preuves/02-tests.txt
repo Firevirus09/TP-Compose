@@ -1,0 +1,71 @@
+
+$ docker compose ps
+SERVICE   IMAGE                STATUS                    PORTS
+api       tp-compose-api       Up 5 seconds (healthy)    3000/tcp
+db        postgres:17-alpine   Up 11 seconds (healthy)   5432/tcp
+front     tp-compose-front     Up Less than a second     0.0.0.0:9091->8080/tcp, [::]:9091->8080/tcp
+
+$ curl -s -o /dev/null -w '%{http_code}' http://localhost:9091/ (front)
+200
+
+$ curl -i http://localhost:9091/api/health (navigateur -> front -> API -> base)
+HTTP/1.1 200 OK
+Server: nginx/1.28.2
+{"api":"ok","base":"ok"}
+
+$ curl -X POST http://localhost:9091/api/compteur (2 fois)
+{"valeur":1}
+{"valeur":2}
+
+$ curl http://localhost:9091/api/compteur
+{"valeur":2}
+
+$ docker compose exec db psql -U tp_user -d tp_compose -c "SELECT * FROM compteur;"
+ id | valeur 
+----+--------
+  1 |      2
+(1 row)
+
+
+$ docker compose exec front wget -qO- http://api:3000/api/health (DNS interne)
+{"api":"ok","base":"ok"}
+
+$ docker compose exec api sh -c "nc -z -w 2 db 5432 && echo db joignable" (DNS interne)
+db joignable
+
+$ Depuis la machine hote : API et base ne sont pas publiees
+localhost:3000 ferme
+localhost:5432 ferme
+
+$ Utilisateurs (id) : front, api
+uid=101(nginx) gid=101(nginx) groups=101(nginx)
+uid=1000(node) gid=1000(node) groups=1000(node)
+
+$ docker compose down, puis docker compose up -d (sans -v)
+conteneurs apres down : 0
+tp-compose_db-data
+{"valeur":2}  <- valeur apres redemarrage
+
+$ docker compose stop db (panne de la base)
+GET /api/compteur -> HTTP 503
+{"erreur":"Base de données indisponible"}
+conteneur api : running, redemarrages : 0
+
+$ docker compose start db (retablissement)
+{"valeur":2}
+
+$ Test navigateur (Chrome headless : clic sur le bouton, puis rechargement)
+titre        : Compteur Compose
+avant clic   : 2
+apres 1 clic : 3
+apres reload : 3
+message erreur visible : false
+erreurs JS   : 0
+appels API   :
+   200 http://localhost:9091/api/compteur
+   200 http://localhost:9091/api/compteur
+   200 http://localhost:9091/api/compteur
+
+$ docker compose logs api (extrait)
+api-1  | API à l'écoute sur le port 3000
+api-1  | Connexion à la base perdue : terminating connection due to administrator command

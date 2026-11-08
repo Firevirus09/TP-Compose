@@ -1,0 +1,48 @@
+name: tp-compose
+
+services:
+  front:
+    build: ./front
+    ports:
+      - "9091:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Pas de "ports" : l'API n'est joignable qu'à travers le front
+  api:
+    build: ./api
+    environment:
+      PORT: "3000"
+      PGHOST: db
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DB:-tp_compose}
+      PGUSER: ${POSTGRES_USER:-tp_user}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-mot_de_passe_factice}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Pas de "ports" : la base n'est joignable que par les autres services
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tp_compose}
+      POSTGRES_USER: ${POSTGRES_USER:-tp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mot_de_passe_factice}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # -h force le TCP : le serveur temporaire de l'initialisation n'écoute pas dessus
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:
