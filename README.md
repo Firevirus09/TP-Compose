@@ -29,6 +29,10 @@ Navigateur ── localhost:9091 ──> front (Nginx, port interne 8080)
 
 Prérequis : Docker et le plugin Docker Compose.
 
+Sur macOS, le plus simple : double-cliquez sur `lancer.command` dans le Finder (il démarre Docker Desktop si besoin, lance les services et ouvre le navigateur), puis sur `arreter.command` pour tout arrêter.
+
+Sinon, en ligne de commande :
+
 ```bash
 docker compose up -d --build
 ```
